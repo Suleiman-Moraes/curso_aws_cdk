@@ -23,7 +23,7 @@ public class CursoAwsCdkApp {
 		
 		Service02Stack service02Stack = new Service02Stack(app, "Service02",
                 clusterStack.getCluster());
-//		service02Stack.addDependency(clusterStack);
+		service02Stack.addDependency(clusterStack);
 		
 		app.synth();
 	}
