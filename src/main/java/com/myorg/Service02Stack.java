@@ -9,6 +9,7 @@ import software.amazon.awscdk.core.RemovalPolicy;
 import software.amazon.awscdk.core.Stack;
 import software.amazon.awscdk.core.StackProps;
 import software.amazon.awscdk.services.applicationautoscaling.EnableScalingProps;
+import software.amazon.awscdk.services.dynamodb.Table;
 import software.amazon.awscdk.services.ecs.AwsLogDriverProps;
 import software.amazon.awscdk.services.ecs.Cluster;
 import software.amazon.awscdk.services.ecs.ContainerImage;
@@ -25,11 +26,13 @@ import software.amazon.awscdk.services.sqs.DeadLetterQueue;
 import software.amazon.awscdk.services.sqs.Queue;
 
 public class Service02Stack  extends Stack {
-    public Service02Stack(final Construct scope, final String id, Cluster cluster, SnsTopic productEventsTopic) {
-        this(scope, id, null, cluster, productEventsTopic);
+    public Service02Stack(final Construct scope, final String id, Cluster cluster, SnsTopic productEventsTopic,
+    		Table productEventDdb) {
+        this(scope, id, null, cluster, productEventsTopic, productEventDdb);
     }
 
-    public Service02Stack(final Construct scope, final String id, final StackProps props, Cluster cluster, SnsTopic productEventsTopic) {
+    public Service02Stack(final Construct scope, final String id, final StackProps props, Cluster cluster, SnsTopic productEventsTopic,
+    		Table productEventDdb) {
         super(scope, id, props);
         
         Queue productEventsDlq = Queue.Builder.create(this, "ProductEventsDlq")
@@ -63,7 +66,7 @@ public class Service02Stack  extends Stack {
                 .taskImageOptions(
                         ApplicationLoadBalancedTaskImageOptions.builder()
                                 .containerName("aws_project02")
-                                .image(ContainerImage.fromRegistry("suleimanmoaraes/curso_aws_project02:1.0.0"))
+                                .image(ContainerImage.fromRegistry("suleimanmoaraes/curso_aws_project02:1.4.1"))
                                 .containerPort(9090)
                                 .logDriver(LogDriver.awsLogs(AwsLogDriverProps.builder()
                                         .logGroup(LogGroup.Builder.create(this, "Service02LogGroup")
@@ -95,6 +98,7 @@ public class Service02Stack  extends Stack {
                 .build());
         
         productEventsQueue.grantConsumeMessages(service02.getTaskDefinition().getTaskRole());
+        productEventDdb.grantReadWriteData(service02.getTaskDefinition().getTaskRole());
     }
 
 }
