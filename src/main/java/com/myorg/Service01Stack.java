@@ -23,14 +23,17 @@ import software.amazon.awscdk.services.ecs.patterns.ApplicationLoadBalancedTaskI
 import software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck;
 import software.amazon.awscdk.services.events.targets.SnsTopic;
 import software.amazon.awscdk.services.logs.LogGroup;
+import software.amazon.awscdk.services.s3.Bucket;
+import software.amazon.awscdk.services.sqs.Queue;
 
 public class Service01Stack extends Stack {
-	public Service01Stack(final Construct scope, final String id, Cluster cluster, SnsTopic productEventsTopic) {
-		this(scope, id, null, cluster, productEventsTopic);
+	public Service01Stack(final Construct scope, final String id, Cluster cluster, SnsTopic productEventsTopic,
+			Bucket invoiceBucket, Queue invoiceQueue) {
+		this(scope, id, null, cluster, productEventsTopic, invoiceBucket, invoiceQueue);
 	}
 
 	public Service01Stack(final Construct scope, final String id, final StackProps props, Cluster cluster,
-			SnsTopic productEventsTopic) {
+			SnsTopic productEventsTopic, Bucket invoiceBucket, Queue invoiceQueue) {
 		super(scope, id, props);
 
 		Map<String, String> envVariables = new HashMap<>();
@@ -39,14 +42,17 @@ public class Service01Stack extends Stack {
 		envVariables.put("SPRING_DATASOURCE_USERNAME", ConstantUtil.RDS_USERNAME);
 		envVariables.put("SPRING_DATASOURCE_PASSWORD", Fn.importValue(ConstantUtil.RDS_PASSWORD));
 
+		envVariables.put("MORAES_AWS_S3-BUCKET-INVOICE-NAME", invoiceBucket.getBucketName());
+		envVariables.put("MORAES_AWS_SQS-QUEUE-INVOICE-EVENTS-NAME", invoiceQueue.getQueueName());
 		envVariables.put("MORAES_AWS_REGION", "us-east-1");
 		envVariables.put("MORAES_AWS_SNS-TOPIC-PRODUCT-EVENTS-ARN", productEventsTopic.getTopic().getTopicArn());
 		envVariables.put("MORAES_SWAGGER_SHOW", "true");
 
 		ApplicationLoadBalancedFargateService service01 = ApplicationLoadBalancedFargateService.Builder
-				.create(this, "ALB01").serviceName("service-01").cluster(cluster).cpu(512).memoryLimitMiB(1024).desiredCount(2).listenerPort(8080)
+				.create(this, "ALB01").serviceName("service-01").cluster(cluster).cpu(512).memoryLimitMiB(1024)
+				.desiredCount(2).listenerPort(8080)
 				.taskImageOptions(ApplicationLoadBalancedTaskImageOptions.builder().containerName("aws_project01")
-						.image(ContainerImage.fromRegistry("suleimanmoaraes/curso_aws_project01:1.5.3"))
+						.image(ContainerImage.fromRegistry("suleimanmoaraes/curso_aws_project01:1.7.1"))
 						.containerPort(8080)
 						.logDriver(LogDriver.awsLogs(AwsLogDriverProps.builder()
 								.logGroup(LogGroup.Builder.create(this, "Service01LogGroup").logGroupName("Service01")
@@ -65,5 +71,8 @@ public class Service01Stack extends Stack {
 						.scaleOutCooldown(Duration.seconds(60)).build());
 
 		productEventsTopic.getTopic().grantPublish(service01.getTaskDefinition().getTaskRole());
+		
+		invoiceQueue.grantConsumeMessages(service01.getTaskDefinition().getTaskRole());
+		invoiceBucket.grantReadWrite(service01.getTaskDefinition().getTaskRole());
 	}
 }
